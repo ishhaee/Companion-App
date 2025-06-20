@@ -1,0 +1,56 @@
+/* Custom styles for Companion App */
+body {
+    font-family: 'Arial', sans-serif;
+}
+
+/* Custom ring graph for water intake */
+.water-intake-ring {
+    position: relative;
+    width: 100px;
+    height: 100px;
+}
+
+.water-intake-ring svg {
+    transform: rotate(-90deg);
+}
+
+.water-intake-ring .progress {
+    fill: none;
+    stroke: #3B82F6;
+    stroke-width: 10;
+    stroke-linecap: round;
+}
+
+.water-intake-ring .background {
+    fill: none;
+    stroke: #E5E7EB;
+    stroke-width: 10;
+}
+
+/* Journal and Goal-specific styles */
+.journal-menu, .goal-menu {
+    z-index: 10;
+}
+
+.journal-menu-toggle, .goal-menu-toggle {
+    cursor: pointer;
+}
+
+.journal-menu-toggle:hover, .goal-menu-toggle:hover {
+    color: #1E40AF;
+}
+
+#delete-modal {
+    z-index: 20;
+}
+
+/* Completed goal styles */
+.completed-goal h4, .completed-goal p {
+    text-decoration: line-through;
+    color: #6B7280; /* Tailwind gray-500 */
+}
+
+/* Sleep-specific styles */
+#sleep-chart {
+    max-height: 250px;
+}

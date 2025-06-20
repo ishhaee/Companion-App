@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companion App - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .water-intake-ring .background {
+            fill: none;
+            stroke: #e6e6e6;
+            stroke-width: 10;
+        }
+        .water-intake-ring .progress {
+            fill: none;
+            stroke: #3b82f6;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-white">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Companion App</h1>
+        <div class="relative">
+            <button id="nav-toggle" class="text-2xl">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div id="nav-menu" class="hidden absolute right-0 mt-2 w-48 bg-white text-blue-700 rounded-lg shadow-lg">
+                <div id="username-display" class="p-4 border-b">Username</div>
+                <a href="#" id="logout" class="block p-4 hover:bg-blue-100">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <main class="p-4">
+        <!-- Date and Weather Rectangle -->
+        <div class="bg-blue-400 bg-opacity-50 text-blue-800 p-4 rounded-lg mb-6">
+            <div class="flex justify-between">
+                <div id="date-day" class="text-lg"></div>
+            </div>
+            <div class="mt-4 flex">
+                <!-- Water Intake -->
+                <div class="w-1/2">
+                    <h2 class="text-lg font-semibold mb-2">Daily Water Intake</h2>
+                    <div class="water-intake-ring mx-auto relative">
+                        <svg width="100" height="100">
+                            <circle class="background" cx="50" cy="50" r="45"/>
+                            <circle class="progress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"/>
+                        </svg>
+                        <div id="water-text" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-700 text-sm"></div>
+                    </div>
+                    <div class="mt-2 flex justify-center space-x-2">
+                        <input type="number" id="water-glasses" min="0" max="20" placeholder="Glasses" class="w-24 p-2 border border-blue-300 rounded text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="add-water-button" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Add</button>
+                    </div>
+                </div>
+                <!-- BMI Calculator -->
+                <div class="w-1/2">
+                    <h2 class="text-lg font-semibold mb-2">BMI Calculator</h2>
+                    <div class="space-y-2">
+                        <input type="number" id="height-input" placeholder="Height (cm)" class="w-full p-2 border border-blue-300 rounded text-blue-700 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="weight-input" placeholder="Weight (kg)" class="w-full p-2 border border-blue-300 rounded text-blue-700 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="calculate-bmi-button" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Calculate</button>
+                        <div id="bmi-result" class="text-center text-blue-800 font-medium"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Functionality Buttons -->
+        <div class="grid grid-cols-2 gap-4">
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='quiz.html'">
+                <img src="assets/button-icons/quiz.png" alt="Quiz" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Take a Quiz</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='journal.html'">
+                <img src="assets/button-icons/journal.png" alt="Journal" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Write a Journal</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='goals.html'">
+                <img src="assets/button-icons/goals.png" alt="Goals" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Set Goals</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='sleep.html'">
+                <img src="assets/button-icons/sleep.png" alt="Sleep" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Sleep Duration</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='mindfulness.html'">
+                <img src="assets/button-icons/mindfulness.png" alt="Mindfulness" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Mindfulness & Podcast</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='insights.html'">
+                <img src="assets/button-icons/insights.png" alt="Insights" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Insights</span>
+            </button>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check authentication
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Elements
+            const usernameDisplay = document.getElementById('username-display');
+            const dateDay = document.getElementById('date-day');
+            const weatherDiv = document.getElementById('weather-text');
+            const navToggle = document.getElementById('nav-toggle');
+            const navMenu = document.getElementById('nav-menu');
+            const waterProgress = document.querySelector('.water-intake-ring .progress');
+            const waterText = document.getElementById('water-text');
+            const addWaterButton = document.getElementById('add-water-button');
+            const waterGlassesInput = document.getElementById('water-glasses');
+            const calculateBmi = document.getElementById('calculate-bmi-button');
+            const bmiResult = document.getElementById('bmi-result');
+            const changePassword = document.getElementById('change-password');
+            const logoutButton = document.getElementById('logout');
+
+            // Display today's date
+            const today = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateDay.textContent = today.toLocaleDateString('en-US', options);
+
+            // Display username from token
+            try {
+                const decodedToken = JSON.parse(atob(token.split('.')[1]));
+                usernameDisplay.textContent = decodedToken.username || 'User';
+            } catch (e) {
+                console.error('Error decoding token');
+                window.location.href = 'index.html';
+            }
+
+            // Navigation menu toggle
+            navToggle.addEventListener('click', () => {
+                navMenu.classList.toggle('hidden');
+            });
+
+            // Logout
+            logoutButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            });
+
+            // Fetch weather
+            async function fetchWeather() {
+                try {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            async (position) => {
+                                const { latitude, longitude } = position.coords;
+                                try {
+                                    const response = await fetch(
+                                        `http://localhost:3000/api/weather?lat=${latitude}&lon=${longitude}`,
+                                        {
+                                            headers: { Authorization: `Bearer ${token}` },
+                                        }
+                                    );
+                                    const data = await response.json();
+                                    if (response.ok) {
+                                        weatherDiv.textContent = `${data.description}, ${data.temperature}°C`;
+                                    } else {
+                                        weatherDiv.textContent = 'Error loading weather';
+                                    }
+                                } catch (error) {
+                                    weatherDiv.textContent = 'Error fetching weather';
+                                }
+                            },
+                            () => {
+                                weatherDiv.textContent = 'Location access denied';
+                            }
+                        );
+                    } else {
+                        weatherDiv.textContent = 'Geolocation not supported';
+                    }
+                } catch (error) {
+                    weatherDiv.textContent = 'Error fetching weather';
+                }
+            }
+            fetchWeather();
+
+            // Water intake handling
+            const glassVolume = 0.25; // 1 glass = 0.25L
+            const totalWater = 2; // Target: 2L (8 glasses)
+            let glasses = 0;
+
+            async function updateWaterIntake() {
+                try {
+                    const response = await fetch('http://localhost:3000/api/water-intake', {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const data = await response.json();
+                    glasses = data.glasses || 0;
+                    const waterIntake = glasses * glassVolume;
+                    const percentage = Math.min((waterIntake / totalWater) * 100, 100);
+                    const offset = 283 - (283 * percentage) / 100;
+                    waterProgress.setAttribute('stroke-dashoffset', offset);
+                    waterText.textContent = `${waterIntake.toFixed(1)}L / ${totalWater.toFixed(1)}L`;
+                } catch (error) {
+                    waterText.textContent = 'Error loading water intake';
+                }
+            }
+
+            // Initialize water intake
+            updateWaterIntake();
+
+            // Handle water intake input
+            addWaterButton.addEventListener('click', async () => {
+                const input = parseInt(waterGlassesInput.value);
+                if (!isNaN(input) && input >= 0) {
+                    try {
+                        const response = await fetch('http://localhost:3000/api/water-intake', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ glasses: input }),
+                        });
+                        if (response.ok) {
+                            await updateWaterIntake();
+                            waterGlassesInput.value = '';
+                        } else {
+                            alert('Error updating water intake');
+                        }
+                    } catch (error) {
+                        alert('Error updating water intake');
+                    }
+                } else {
+                    alert('Please enter a valid number of glasses');
+                }
+            });
+
+            // BMI Calculator
+            calculateBmi.addEventListener('click', async () => {
+                const height = parseFloat(document.getElementById('height-input').value);
+                const weight = parseFloat(document.getElementById('weight-input').value);
+                if (height > 0 && weight > 0) {
+                    const heightInMeters = height / 100;
+                    const bmi = weight / (heightInMeters * heightInMeters);
+                    let category;
+                    if (bmi < 18.5) category = 'Underweight';
+                    else if (bmi < 25) category = 'Normal';
+                    else if (bmi < 30) category = 'Overweight';
+                    else category = 'Obese';
+                    bmiResult.textContent = `BMI: ${bmi.toFixed(1)} (${category})`;
+
+                    // Save to backend
+                    try {
+                        await fetch('http://localhost:3000/api/bmi-history', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ height, weight, bmi, category }),
+                        });
+                    } catch (error) {
+                        console.error('Error saving BMI:', error);
+                    }
+                } else {
+                    bmiResult.textContent = 'Please enter valid height and weight';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/auth.js" defer></script>
+</head>
+<body class="bg-white flex items-center justify-center min-h-screen">
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
+        <img src="assets/logo.png" alt="Companion App Logo" class="mt-4 h-24">
+        <h1 class="mt-2 text-2xl font-semibold text-blue-700">Welcome to Companion App</h1>
+    </div>
+
+    <!-- Login/Signup Form -->
+    <div id="auth-screen" class="hidden flex flex-col items-center justify-center w-full max-w-md">
+        <img src="assets/logo.png" alt="Companion App Logo" class="h-32 mb-6">
+        <div class="bg-blue-100 p-8 rounded-lg shadow-md w-full">
+            <h2 id="form-title" class="text-2xl font-bold text-blue-700 text-center mb-6">Login</h2>
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-blue-700">Username</label>
+                    <input type="text" id="username" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-blue-700">Password</label>
+                    <input type="password" id="password" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+            </form>
+            <p class="mt-4 text-center text-blue-700">
+                <a href="#" id="toggle-form" class="underline">Don't have an account? Sign Up</a>
+            </p>
+            <p id="error-message" class="text-center mt-4 text-sm hidden"></p>
+        </div>
+    </div>
+</body>
+</html>

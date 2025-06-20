@@ -1,0 +1,1187 @@
+const express = require('express');
+const sequelize = require('sequelize');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const axios = require('axios');
+const { DataTypes, Op } = require('sequelize');
+
+const app = express();
+const port = 3000;
+const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key';
+const WEATHER_API_KEY = process.env.WEATHER_API || 'your-openweathermap-api-key';
+
+// Middleware
+app.use(cors()); // Allow all origins for debugging
+app.use(express.json());
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'Backend running' });
+});
+
+// MySQL Database Connection
+const sequelizeInstance = new sequelize('companion_app', 'root', 'root', {
+  host: 'localhost',
+  dialect: 'mysql',
+  port: 3306,
+  logging: console.log,
+});
+
+// Test database connection
+async function testConnection() {
+  try {
+    await sequelizeInstance.authenticate();
+    console.log('Connection to MySQL established successfully.');
+  } catch (error) {
+    console.error('Unable to connect to the database:', error.message, error.stack);
+    process.exit(1);
+  }
+}
+
+// Define Models
+const User = sequelizeInstance.define('User', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  username: { type: DataTypes.STRING, allowNull: false, unique: true },
+  password: { type: DataTypes.STRING, allowNull: false },
+});
+
+const Journal = sequelizeInstance.define('Journal', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  title: { type: DataTypes.STRING, allowNull: false },
+  content: { type: DataTypes.TEXT, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
+  archived: { type: DataTypes.BOOLEAN, defaultValue: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+const Goal = sequelizeInstance.define('Goal', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  title: { type: DataTypes.STRING, allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
+  archived: { type: DataTypes.BOOLEAN, defaultValue: false },
+  completed: { type: DataTypes.BOOLEAN, defaultValue: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+const SleepRecord = sequelizeInstance.define('SleepRecord', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  date: { type: DataTypes.DATE, allowNull: false },
+  sleepTime: { type: DataTypes.STRING, allowNull: false },
+  awakeTime: { type: DataTypes.STRING, allowNull: false },
+  duration: { type: DataTypes.FLOAT, allowNull: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+const WaterIntake = sequelizeInstance.define('WaterIntake', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  date: { type: DataTypes.DATE, allowNull: false },
+  glasses: { type: DataTypes.INTEGER, allowNull: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+const BMIHistory = sequelizeInstance.define('BMIHistory', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  date: { type: DataTypes.DATE, allowNull: false },
+  height: { type: DataTypes.FLOAT, allowNull: false },
+  weight: { type: DataTypes.FLOAT, allowNull: false },
+  bmi: { type: DataTypes.FLOAT, allowNull: false },
+  category: { type: DataTypes.STRING, allowNull: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+const Mood = sequelizeInstance.define('Mood', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  mood: { type: DataTypes.STRING, allowNull: false },
+  subMood: { type: DataTypes.STRING, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
+  userId: { type: DataTypes.INTEGER, references: { model: User, key: 'id' } },
+});
+
+// Define Associations
+User.hasMany(Journal, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+Journal.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Goal, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+Goal.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(SleepRecord, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+SleepRecord.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(WaterIntake, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+WaterIntake.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(BMIHistory, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+BMIHistory.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Mood, { foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+Mood.belongsTo(User, { foreignKey: 'userId' });
+
+// Middleware to authenticate JWT
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) {
+    console.log('No token provided');
+    return res.status(401).json({ error: 'Access denied: No token provided' });
+  }
+
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) {
+      console.log('Token verification failed:', err.message);
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Authentication Routes
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      console.log('Register: Missing username or password');
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    if (password.length < 6) {
+      console.log('Register: Password too short');
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    const existingUser = await User.findOne({ where: { username } });
+    if (existingUser) {
+      console.log('Register: Username already exists:', username);
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, password: hashedPassword });
+    console.log('User registered:', user.id, username);
+    res.status(201).json({ message: 'User registered', userId: user.id });
+  } catch (error) {
+    console.error('Register error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      console.log('Login: Missing username or password');
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    const user = await User.findOne({ where: { username } });
+    if (!user) {
+      console.log('Login: User not found:', username);
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      console.log('Login: Invalid password for user:', username);
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
+    console.log('Login successful:', username, 'Token issued');
+    res.json({ token, username: user.username });
+  } catch (error) {
+    console.error('Login error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to login' });
+  }
+});
+
+// Journal Routes
+app.get('/api/journals', authenticateToken, async (req, res) => {
+  try {
+    const journals = await Journal.findAll({ where: { userId: req.user.id, archived: req.query.archived === 'true' } });
+    res.json(journals);
+  } catch (error) {
+    console.error('Get journals error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch journals' });
+  }
+});
+
+app.post('/api/journals', authenticateToken, async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!title || !content) {
+      console.log('Post journal: Missing title or content');
+      return res.status(400).json({ error: 'Title and content are required' });
+    }
+    const journal = await Journal.create({
+      title,
+      content,
+      date: new Date(),
+      archived: false,
+      userId: req.user.id,
+    });
+    res.status(201).json(journal);
+  } catch (error) {
+    console.error('Post journal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to create journal' });
+  }
+});
+
+app.put('/api/journals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, archived } = req.body;
+    const journal = await Journal.findOne({ where: { id, userId: req.user.id } });
+    if (!journal) {
+      console.log('Update journal: Journal not found:', id);
+      return res.status(404).json({ error: 'Journal not found' });
+    }
+    await journal.update({ title, content, date: new Date(), archived });
+    res.json(journal);
+  } catch (error) {
+    console.error('Update journal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to update journal' });
+  }
+});
+
+app.delete('/api/journals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const journal = await Journal.findOne({ where: { id, userId: req.user.id } });
+    if (!journal) {
+      console.log('Delete journal: Journal not found:', id);
+      return res.status(404).json({ error: 'Journal not found' });
+    }
+    await journal.destroy();
+    res.json({ message: 'Journal deleted' });
+  } catch (error) {
+    console.error('Delete journal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete journal' });
+  }
+});
+
+// Goal Routes
+app.get('/api/goals', authenticateToken, async (req, res) => {
+  try {
+    const goals = await Goal.findAll({ where: { userId: req.user.id, archived: req.query.archived === 'true' } });
+    res.json(goals);
+  } catch (error) {
+    console.error('Get goals error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch goals' });
+  }
+});
+
+app.post('/api/goals', authenticateToken, async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    if (!title || !description) {
+      console.log('Post goal: Missing title or description');
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
+    const goal = await Goal.create({
+      title,
+      description,
+      date: new Date(),
+      archived: false,
+      completed: false,
+      userId: req.user.id,
+    });
+    res.status(201).json(goal);
+  } catch (error) {
+    console.error('Post goal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to create goal' });
+  }
+});
+
+app.put('/api/goals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, archived, completed } = req.body;
+    const goal = await Goal.findOne({ where: { id, userId: req.user.id } });
+    if (!goal) {
+      console.log('Update goal: Goal not found:', id);
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    await goal.update({ title, description, date: new Date(), archived, completed });
+    res.json(goal);
+  } catch (error) {
+    console.error('Update goal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to update goal' });
+  }
+});
+
+app.delete('/api/goals/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const goal = await Goal.findOne({ where: { id, userId: req.user.id } });
+    if (!goal) {
+      console.log('Delete goal: Goal not found:', id);
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    await goal.destroy();
+    res.json({ message: 'Goal deleted' });
+  } catch (error) {
+    console.error('Delete goal error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to delete goal' });
+  }
+});
+
+// Sleep Record Routes
+app.get('/api/sleep-records', authenticateToken, async (req, res) => {
+  try {
+    const sleepRecords = await SleepRecord.findAll({ where: { userId: req.user.id } });
+    res.json(sleepRecords);
+  } catch (error) {
+    console.error('Get sleep records error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch sleep records' });
+  }
+});
+
+app.post('/api/sleep-records', authenticateToken, async (req, res) => {
+  try {
+    const { sleepTime, awakeTime } = req.body;
+    if (!sleepTime || !awakeTime) {
+      console.log('Post sleep record: Missing sleep or awake time');
+      return res.status(400).json({ error: 'Sleep and awake times are required' });
+    }
+
+    const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
+    const [awakeHours, awakeMinutes] = awakeTime.split(':').map(Number);
+    let sleepDate = new Date(2025, 4, 27, sleepHours, sleepMinutes);
+    let awakeDate = new Date(2025, 4, 27, awakeHours, awakeMinutes);
+    if (awakeDate <= sleepDate) awakeDate.setDate(awakeDate.getDate() + 1);
+    const duration = (awakeDate - sleepDate) / (1000 * 60 * 60);
+
+    const sleepRecord = await SleepRecord.create({
+      date: new Date(),
+      sleepTime,
+      awakeTime,
+      duration,
+      userId: req.user.id,
+    });
+    res.status(201).json(sleepRecord);
+  } catch (error) {
+    console.error('Post sleep record error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to create sleep record' });
+  }
+});
+
+app.put('/api/sleep-records/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sleepTime, awakeTime } = req.body;
+    const sleepRecord = await SleepRecord.findOne({ where: { id, userId: req.user.id } });
+    if (!sleepRecord) {
+      console.log('Update sleep record: Record not found:', id);
+      return res.status(404).json({ error: 'Sleep record not found' });
+    }
+
+    const [sleepHours, sleepMinutes] = sleepTime.split(':').map(Number);
+    const [awakeHours, awakeMinutes] = awakeTime.split(':').map(Number);
+    let sleepDate = new Date(2025, 4, 27, sleepHours, sleepMinutes);
+    let awakeDate = new Date(2025, 4, 27, awakeHours, awakeMinutes);
+    if (awakeDate <= sleepDate) awakeDate.setDate(awakeDate.getDate() + 1);
+    const duration = (awakeDate - sleepDate) / (1000 * 60 * 60);
+
+    await sleepRecord.update({ sleepTime, awakeTime, duration, date: new Date() });
+    res.json(sleepRecord);
+  } catch (error) {
+    console.error('Update sleep record error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to update sleep record' });
+  }
+});
+
+// Water Intake Routes
+app.get('/api/water-intake', authenticateToken, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const waterIntake = await WaterIntake.findOne({
+      where: {
+        userId: req.user.id,
+        date: { [Op.gte]: today },
+      },
+    });
+    res.json(waterIntake || { glasses: 0 });
+  } catch (error) {
+    console.error('Get water intake error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch water intake' });
+  }
+});
+
+app.post('/api/water-intake', authenticateToken, async (req, res) => {
+  try {
+    const { glasses } = req.body;
+    if (!Number.isInteger(glasses) || glasses < 0) {
+      console.log('Post water intake: Invalid glasses value:', glasses);
+      return res.status(400).json({ error: 'Valid number of glasses required' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let waterIntake = await WaterIntake.findOne({
+      where: {
+        userId: req.user.id,
+        date: { [Op.gte]: today },
+      },
+    });
+
+    if (waterIntake) {
+      waterIntake.glasses += glasses;
+      if (waterIntake.glasses > 20) waterIntake.glasses = 20;
+      await waterIntake.save();
+    } else {
+      waterIntake = await WaterIntake.create({
+        date: new Date(),
+        glasses: Math.min(glasses, 20),
+        userId: req.user.id,
+      });
+    }
+    res.status(201).json(waterIntake);
+  } catch (error) {
+    console.error('Post water intake error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to update water intake' });
+  }
+});
+
+// BMI History Routes
+app.post('/api/bmi-history', authenticateToken, async (req, res) => {
+  try {
+    const { height, weight, bmi, category } = req.body;
+    if (!height || !weight || !bmi || !category) {
+      console.log('Post BMI: Missing required fields');
+      return res.status(400).json({ error: 'Height, weight, BMI, and category are required' });
+    }
+    const bmiRecord = await BMIHistory.create({
+      date: new Date(),
+      height,
+      weight,
+      bmi,
+      category,
+      userId: req.user.id,
+    });
+    res.status(201).json(bmiRecord);
+  } catch (error) {
+    console.error('Post BMI error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to save BMI record' });
+  }
+});
+
+// Mood Routes
+app.post('/api/moods', authenticateToken, async (req, res) => {
+  try {
+    const { mood, subMood } = req.body;
+    if (!mood || !subMood) {
+      console.log('Post mood: Missing mood or subMood');
+      return res.status(400).json({ error: 'Mood and sub-mood are required' });
+    }
+    const moodRecord = await Mood.create({
+      mood,
+      subMood,
+      date: new Date(),
+      userId: req.user.id,
+    });
+    console.log('Mood saved:', moodRecord.id, mood, subMood);
+    res.status(201).json(moodRecord);
+  } catch (error) {
+    console.error('Post mood error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to save mood' });
+  }
+});
+
+app.get('/api/moods', authenticateToken, async (req, res) => {
+  try {
+    const moods = await Mood.findAll({
+      where: { userId: req.user.id },
+      order: [['date', 'DESC']],
+    });
+    res.json(moods);
+  } catch (error) {
+    console.error('Get moods error:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch mood history' });
+  }
+});
+
+// Weather Route
+app.get('/api/weather', async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+    if (!lat || !lon) {
+      console.log('Get weather: Missing lat or lon');
+      return res.status(400).json({ error: 'Latitude and longitude required' });
+    }
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_API_KEY}`
+    );
+    const { weather, main } = response.data;
+    res.json({
+      description: weather[0].description.charAt(0).toUpperCase() + weather[0].description.slice(1),
+      temperature: Math.round(main.temp),
+    });
+  } catch (error) {
+    console.error('Get weather error:', error.message, error.stack);
+    res.status(500).json({ error: 'Error fetching weather data' });
+  }
+});
+
+// Initialize Database and Start Server
+(async () => {
+  await testConnection();
+  await sequelizeInstance.sync(); // No force: true to persist data
+  app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+  });
+})(); server.js
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/auth.js" defer></script>
+</head>
+<body class="bg-white flex items-center justify-center min-h-screen">
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
+        <img src="assets/logo.png" alt="Companion App Logo" class="mt-4 h-24">
+        <h1 class="mt-2 text-2xl font-semibold text-blue-700">Welcome to Companion App</h1>
+    </div>
+
+    <!-- Login/Signup Form -->
+    <div id="auth-screen" class="hidden flex flex-col items-center justify-center">
+        <img src="assets/logo.png" alt="Companion App Logo" class="h-32 mb-6">
+        <div class="bg-blue-100 p-8 rounded-lg shadow-md w-full max-w-md">
+            <h2 id="form-title" class="text-2xl font-bold text-blue-700 text-center mb-6">Login</h2>
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-blue-700">Username</label>
+                    <input type="text" id="username" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-blue-700">Password</label>
+                    <input type="password" id="password" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+            </form>
+            <p class="mt-4 text-center text-blue-700">
+                <a href="#" id="toggle-form" class="underline">Don't have an account? Sign Up</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html> index.html
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Show auth form after 2.5 seconds
+  setTimeout(() => {
+    document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('auth-screen').classList.remove('hidden');
+  }, 2500);
+
+  const form = document.getElementById('auth-form');
+  const toggleLink = document.getElementById('toggle-form');
+  const formTitle = document.getElementById('form-title');
+  const errorMessage = document.getElementById('error-message');
+  let isLogin = true;
+
+  // Toggle between login and signup
+  toggleLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    isLogin = !isLogin;
+    formTitle.textContent = isLogin ? 'Login' : 'Sign Up';
+    toggleLink.textContent = isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login';
+    form.querySelector('button').textContent = isLogin ? 'Login' : 'Sign Up';
+    if (errorMessage) {
+      errorMessage.classList.add('hidden');
+      errorMessage.textContent = '';
+    }
+    form.reset();
+  });
+
+  // Handle form submission
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    // Input validation
+    if (!username || !password) {
+      errorMessage.textContent = 'Username and password are required';
+      errorMessage.classList.remove('hidden');
+      errorMessage.classList.add('text-red-500');
+      return;
+    }
+
+    if (password.length < 6) {
+      errorMessage.textContent = 'Password must be at least 6 characters';
+      errorMessage.classList.remove('hidden');
+      errorMessage.classList.add('text-red-500');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/${isLogin ? 'login' : 'register'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json();
+      console.log('API Response:', { status: response.status, data }); // Debug log
+
+      if (response.ok) {
+        if (isLogin) {
+          localStorage.setItem('token', data.token);
+          console.log('Token stored:', localStorage.getItem('token')); // Debug log
+          window.location.href = 'components/dashboard.html';
+        } else {
+          errorMessage.textContent = 'Registration successful! Please log in.';
+          errorMessage.classList.remove('hidden', 'text-red-500');
+          errorMessage.classList.add('text-green-500');
+          isLogin = true;
+          formTitle.textContent = 'Login';
+          toggleLink.textContent = "Don't have an account? Sign Up";
+          form.querySelector('button').textContent = 'Login';
+          form.reset();
+        }
+      } else {
+        errorMessage.textContent = data.error || (isLogin ? 'Login failed' : 'Registration failed');
+        errorMessage.classList.remove('hidden');
+        errorMessage.classList.add('text-red-500');
+      }
+    } catch (error) {
+      console.error('Fetch error:', error.message, error.stack); // Detailed debug
+      let errorText = 'Network error. Please check if the server is running or try again later.';
+      if (error.message.includes('Failed to fetch')) {
+        errorText = 'Cannot connect to server. Ensure backend is running on http://localhost:3000.';
+      }
+      errorMessage.textContent = errorText;
+      errorMessage.classList.remove('hidden');
+      errorMessage.classList.add('text-red-500');
+    }
+  });
+}); auth.js
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companion App - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .water-intake-ring .background {
+            fill: none;
+            stroke: #e6e6e6;
+            stroke-width: 10;
+        }
+        .water-intake-ring .progress {
+            fill: none;
+            stroke: #3b82f6;
+            stroke-width: 10;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-white">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Companion App</h1>
+        <div class="relative">
+            <button id="nav-toggle" class="text-2xl">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div id="nav-menu" class="hidden absolute right-0 mt-2 w-48 bg-white text-blue-700 rounded-lg shadow-lg">
+                <div id="username-display" class="p-4 border-b">Username</div>
+                <a href="#" id="change-password" class="block p-4 hover:bg-blue-100">Change Password</a>
+                <a href="#" id="logout" class="block p-4 hover:bg-blue-100">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <main class="p-4">
+        <!-- Date and Weather Rectangle -->
+        <div class="bg-blue-400 bg-opacity-50 text-blue-800 p-4 rounded-lg mb-6">
+            <div class="flex justify-between">
+                <div id="date-day" class="text-lg"></div>
+                <div id="weather-text" class="text-lg">Loading weather...</div>
+            </div>
+            <div class="mt-4 flex">
+                <!-- Water Intake -->
+                <div class="w-1/2">
+                    <h2 class="text-lg font-semibold mb-2">Daily Water Intake</h2>
+                    <div class="water-intake-ring mx-auto relative">
+                        <svg width="100" height="100">
+                            <circle class="background" cx="50" cy="50" r="45"/>
+                            <circle class="progress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"/>
+                        </svg>
+                        <div id="water-text" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-700 text-sm"></div>
+                    </div>
+                    <div class="mt-2 flex justify-center space-x-2">
+                        <input type="number" id="water-glasses" min="0" max="20" placeholder="Glasses" class="w-24 p-2 border border-blue-300 rounded text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="add-water-button" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Add</button>
+                    </div>
+                </div>
+                <!-- BMI Calculator -->
+                <div class="w-1/2">
+                    <h2 class="text-lg font-semibold mb-2">BMI Calculator</h2>
+                    <div class="space-y-2">
+                        <input type="number" id="height-input" placeholder="Height (cm)" class="w-full p-2 border border-blue-300 rounded text-blue-700 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="weight-input" placeholder="Weight (kg)" class="w-full p-2 border border-blue-300 rounded text-blue-700 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button id="calculate-bmi-button" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Calculate</button>
+                        <div id="bmi-result" class="text-center text-blue-800 font-medium"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Functionality Buttons -->
+        <div class="grid grid-cols-2 gap-4">
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='quiz.html'">
+                <img src="assets/button-icons/quiz.png" alt="Quiz" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Take a Quiz</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='journal.html'">
+                <img src="assets/button-icons/journal.png" alt="Journal" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Write a Journal</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='goals.html'">
+                <img src="assets/button-icons/goals.png" alt="Goals" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Set Goals</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='sleep.html'">
+                <img src="assets/button-icons/sleep.png" alt="Sleep" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Sleep Duration</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='mindfulness.html'">
+                <img src="assets/button-icons/mindfulness.png" alt="Mindfulness" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Mindfulness & Podcast</span>
+            </button>
+            <button class="bg-blue-100 p-4 rounded-lg flex flex-col items-center hover:bg-blue-200" onclick="window.location.href='insights.html'">
+                <img src="assets/button-icons/insights.png" alt="Insights" class="h-12 mb-2">
+                <span class="text-blue-700 font-semibold">Insights</span>
+            </button>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check authentication
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Elements
+            const usernameDisplay = document.getElementById('username-display');
+            const dateDay = document.getElementById('date-day');
+            const weatherDiv = document.getElementById('weather-text');
+            const navToggle = document.getElementById('nav-toggle');
+            const navMenu = document.getElementById('nav-menu');
+            const waterProgress = document.querySelector('.water-intake-ring .progress');
+            const waterText = document.getElementById('water-text');
+            const addWaterButton = document.getElementById('add-water-button');
+            const waterGlassesInput = document.getElementById('water-glasses');
+            const calculateBmi = document.getElementById('calculate-bmi-button');
+            const bmiResult = document.getElementById('bmi-result');
+            const changePassword = document.getElementById('change-password');
+            const logoutButton = document.getElementById('logout');
+
+            // Display today's date
+            const today = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateDay.textContent = today.toLocaleDateString('en-US', options);
+
+            // Display username from token
+            try {
+                const decodedToken = JSON.parse(atob(token.split('.')[1]));
+                usernameDisplay.textContent = decodedToken.username || 'User';
+            } catch (e) {
+                console.error('Error decoding token');
+                window.location.href = 'index.html';
+            }
+
+            // Navigation menu toggle
+            navToggle.addEventListener('click', () => {
+                navMenu.classList.toggle('hidden');
+            });
+
+            // Logout
+            logoutButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            });
+
+            // Change Password (Placeholder)
+            changePassword.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Change password functionality not implemented.');
+            });
+
+            // Fetch weather
+            async function fetchWeather() {
+                try {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            async (position) => {
+                                const { latitude, longitude } = position.coords;
+                                try {
+                                    const response = await fetch(
+                                        `http://localhost:3000/api/weather?lat=${latitude}&lon=${longitude}`,
+                                        {
+                                            headers: { Authorization: `Bearer ${token}` },
+                                        }
+                                    );
+                                    const data = await response.json();
+                                    if (response.ok) {
+                                        weatherDiv.textContent = `${data.description}, ${data.temperature}°C`;
+                                    } else {
+                                        weatherDiv.textContent = 'Error loading weather';
+                                    }
+                                } catch (error) {
+                                    weatherDiv.textContent = 'Error fetching weather';
+                                }
+                            },
+                            () => {
+                                weatherDiv.textContent = 'Location access denied';
+                            }
+                        );
+                    } else {
+                        weatherDiv.textContent = 'Geolocation not supported';
+                    }
+                } catch (error) {
+                    weatherDiv.textContent = 'Error fetching weather';
+                }
+            }
+            fetchWeather();
+
+            // Water intake handling
+            const glassVolume = 0.25; // 1 glass = 0.25L
+            const totalWater = 2; // Target: 2L (8 glasses)
+            let glasses = 0;
+
+            async function updateWaterIntake() {
+                try {
+                    const response = await fetch('http://localhost:3000/api/water-intake', {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const data = await response.json();
+                    glasses = data.glasses || 0;
+                    const waterIntake = glasses * glassVolume;
+                    const percentage = Math.min((waterIntake / totalWater) * 100, 100);
+                    const offset = 283 - (283 * percentage) / 100;
+                    waterProgress.setAttribute('stroke-dashoffset', offset);
+                    waterText.textContent = `${waterIntake.toFixed(1)}L / ${totalWater.toFixed(1)}L`;
+                } catch (error) {
+                    waterText.textContent = 'Error loading water intake';
+                }
+            }
+
+            // Initialize water intake
+            updateWaterIntake();
+
+            // Handle water intake input
+            addWaterButton.addEventListener('click', async () => {
+                const input = parseInt(waterGlassesInput.value);
+                if (!isNaN(input) && input >= 0) {
+                    try {
+                        const response = await fetch('http://localhost:3000/api/water-intake', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ glasses: input }),
+                        });
+                        if (response.ok) {
+                            await updateWaterIntake();
+                            waterGlassesInput.value = '';
+                        } else {
+                            alert('Error updating water intake');
+                        }
+                    } catch (error) {
+                        alert('Error updating water intake');
+                    }
+                } else {
+                    alert('Please enter a valid number of glasses');
+                }
+            });
+
+            // BMI Calculator
+            calculateBmi.addEventListener('click', async () => {
+                const height = parseFloat(document.getElementById('height-input').value);
+                const weight = parseFloat(document.getElementById('weight-input').value);
+                if (height > 0 && weight > 0) {
+                    const heightInMeters = height / 100;
+                    const bmi = weight / (heightInMeters * heightInMeters);
+                    let category;
+                    if (bmi < 18.5) category = 'Underweight';
+                    else if (bmi < 25) category = 'Normal';
+                    else if (bmi < 30) category = 'Overweight';
+                    else category = 'Obese';
+                    bmiResult.textContent = `BMI: ${bmi.toFixed(1)} (${category})`;
+
+                    // Save to backend
+                    try {
+                        await fetch('http://localhost:3000/api/bmi-history', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ height, weight, bmi, category }),
+                        });
+                    } catch (error) {
+                        console.error('Error saving BMI:', error);
+                    }
+                } else {
+                    bmiResult.textContent = 'Please enter valid height and weight';
+                }
+            });
+        });
+    </script>
+</body>
+</html> dashboard.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take a Quiz - Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <button id="back-button" class="text-2xl" onclick="window.location.href='dashboard.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-2xl font-bold">Take a Quiz</h1>
+        <div class="w-8"></div> <!-- Placeholder for alignment -->
+    </header>
+    <!-- Main Content -->
+    <div class="flex-grow flex items-center justify-center">
+        <article class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <!-- Quiz Form -->
+            <section class="space-y-4">
+                <form id="quizForm" class="space-y-4">
+                    <div>
+                        <p class="text-gray-700">How would you describe your energy level today?</p>
+                        <select class="form-control" name="q1">
+                            <option value="1">Very Low</option>
+                            <option value="2">Low</option>
+                            <option value="3">Moderate</option>
+                            <option value="4">High</option>
+                            <option value="5">Very High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How positive do you feel today?</p>
+                        <select class="form-control" name="q2">
+                            <option value="1">Very Negative</option>
+                            <option value="2">Somewhat Negative</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Positive</option>
+                            <option value="5">Very Positive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How stressed are you feeling right now?</p>
+                        <select class="form-control" name="q3">
+                            <option value="1">Very Stressed</option>
+                            <option value="2">Somewhat Stressed</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Relaxed</option>
+                            <option value="5">Very Relaxed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How motivated are you today?</p>
+                        <select class="form-control" name="q4">
+                            <option value="1">Not Motivated</option>
+                            <option value="2">Slightly Motivated</option>
+                            <option value="3">Moderately Motivated</option>
+                            <option value="4">Motivated</option>
+                            <option value="5">Highly Motivated</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How connected do you feel to others?</p>
+                        <select class="form-control" name="q5">
+                            <option value="1">Very Disconnected</option>
+                            <option value="2">Somewhat Disconnected</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Connected</option>
+                            <option value="5">Very Connected</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition">Submit Quiz</button>
+                </form>
+                <!-- Result Display -->
+                <div id="result" class="mt-4 hidden text-center">
+                    <p id="moodResult" class="text-lg font-semibold text-blue-600"></p>
+                    <p id="subMoodResult" class="text-gray-700"></p>
+                    <p class="text-gray-700 mt-2">Based on your mood, we recommend checking out some videos in the Mindfulness & Podcast section.</p>
+                    <button onclick="window.location.href='mindfulness.html'" class="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition">Go to Mindfulness & Podcast</button>
+                </div>
+            </section>
+        </article>
+    </div>
+
+    <script>
+        // Log all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = async (url, options) => {
+            console.log('Fetch request:', { url, options });
+            try {
+                const response = await originalFetch(url, options);
+                console.log('Fetch response:', { url, status: response.status, data: await response.clone().json().catch(() => null) });
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', { url, error: error.message });
+                throw error;
+            }
+        };
+
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        console.log('Token check:', token ? `Token: ${token.substring(0, 10)}...` : 'No token');
+        if (!token) {
+            console.log('Redirecting to index.html due to missing token');
+            alert('Please log in to take the quiz.');
+            window.location.href = '/index.html'; // Relative path
+            return;
+        }
+
+        // Verify token with backend
+        fetch('http://localhost:3000/api/health', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json())
+          .then(data => console.log('Token verification:', data))
+          .catch(err => console.error('Token verification failed:', err.message));
+
+        // Loading YouTube API
+        function loadYouTubeAPI() {
+            console.log('Loading YouTube API');
+            gapi.load('client', () => {
+                gapi.client.init({
+                    apiKey: 'AIzaSyA6NkeF4uJmEW4AuH0YNYVAy6ySBLcHiXA', // Replace with your YouTube Data API key
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+                }).then(() => console.log('YouTube API initialized'))
+                  .catch(err => console.error('YouTube API init error:', err));
+            });
+        }
+
+        // Calculating mood based on quiz answers
+        function calculateMood(answers) {
+            console.log('Calculating mood with answers:', answers);
+            const score = answers.reduce((sum, val) => sum + parseInt(val), 0) / answers.length;
+            let mood, subMood;
+            if (score <= 1.5) {
+                mood = 'Awful';
+                subMood = 'sad af';
+            } else if (score <= 2.5) {
+                mood = 'Bad';
+                subMood = 'worried';
+            } else if (score <= 3.5) {
+                mood = 'Normal';
+                subMood = 'wondering';
+            } else if (score <= 4.5) {
+                mood = 'Good';
+                subMood = 'yolo';
+            } else {
+                mood = 'Amazing';
+                subMood = 'over the moon';
+            }
+            console.log('Mood calculated:', { mood, subMood });
+            return { mood, subMood };
+        }
+
+        // Recommending YouTube videos based on mood
+        function recommendVideos(mood) {
+            console.log('Recommending videos for mood:', mood);
+            const queries = {
+                Awful: 'calming meditation',
+                Bad: 'stress relief meditation',
+                Normal: 'daily mindfulness',
+                Good: 'motivational podcast',
+                Amazing: 'inspirational talk'
+            };
+            const searchQuery = queries[mood] || 'mindfulness';
+            gapi.client.youtube.search.list({
+                part: 'snippet',
+                q: searchQuery,
+                maxResults: 5,
+                type: 'video'
+            }).then(response => {
+                const videos = response.result.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title
+                }));
+                localStorage.setItem('recommendedVideos', JSON.stringify(videos));
+                console.log('Videos saved:', videos);
+            }).catch(err => console.error('YouTube API error:', err));
+        }
+
+        // Handling form submission
+        document.getElementById('quizForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('Form submitted');
+            const form = e.target;
+            const answers = [
+                form.q1.value,
+                form.q2.value,
+                form.q3.value,
+                form.q4.value,
+                form.q5.value
+            ].filter(val => val !== '');
+            if (answers.length !== 5) {
+                alert('Please answer all questions.');
+                console.log('Incomplete answers:', answers);
+                return;
+            }
+            const { mood, subMood } = calculateMood(answers);
+
+            // Save mood to backend
+            try {
+                const response = await fetch('http://localhost:3000/api/moods', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ mood, subMood })
+                });
+                const data = await response.json();
+                console.log('Backend response:', { status: response.status, data });
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                console.log('Mood saved to backend:', data);
+            } catch (error) {
+                console.error('Error saving mood:', error.message);
+                alert(`Failed to save mood: ${error.message}. Please log in again.`);
+                window.location.href = '/index.html';
+                return;
+            }
+
+            // Proceed with video recommendations and UI update
+            recommendVideos(mood);
+            document.getElementById('moodResult').textContent = `Your Mood: ${mood}`;
+            document.getElementById('subMoodResult').textContent = `Feeling: ${subMood}`;
+            document.getElementById('result').classList.remove('hidden');
+            form.classList.add('hidden');
+        });
+
+        // Initializing YouTube API
+        loadYouTubeAPI();
+    </script>
+</body>
+</html> quiz.html
+
+Please provide changes in these code 

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companion App - Sleep Duration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/sleep.js" defer></script>
+</head>
+<body class="bg-white">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <button id="back-button" class="text-2xl">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-2xl font-bold">Sleep Duration</h1>
+        <div class="w-8"></div> <!-- Placeholder for alignment -->
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-4">
+        <!-- Sleep Duration Graph -->
+        <div class="bg-blue-100 p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold text-blue-700 mb-4">Daily Sleep Duration</h2>
+            <canvas id="sleep-chart" class="w-full h-64"></canvas>
+        </div>
+
+        <!-- Sleep Input Form -->
+        <div class="bg-blue-100 p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-blue-700 mb-4">Log Sleep</h2>
+            <form id="sleep-form" class="space-y-4">
+                <div>
+                    <label for="sleep-time" class="block text-sm font-medium text-blue-700">Sleeping Time</label>
+                    <input type="time" id="sleep-time" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label for="awake-time" class="block text-sm font-medium text-blue-700">Awakening Time</label>
+                    <input type="time" id="awake-time" class="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Save Sleep Record</button>
+            </form>
+            <div id="duration-result" class="text-center text-blue-700 font-medium mt-4"></div>
+        </div>
+    </main>
+</body>
+</html>

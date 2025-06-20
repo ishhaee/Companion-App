@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insights - Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <button id="back-button" class="text-2xl" onclick="window.location.href='dashboard.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-2xl font-bold">Insights</h1>
+        <div class="w-8"></div> <!-- Placeholder for alignment -->
+    </header>
+    <!-- Main Content -->
+    <main class="flex-grow p-4">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto space-y-8">
+            <!-- Daily Mood Section -->
+            <section>
+                <h2 class="text-xl font-semibold text-blue-600 mb-4">Daily Mood</h2>
+                <canvas id="moodChart" class="w-full h-64"></canvas>
+            </section>
+            <!-- Daily Sleep Duration Section -->
+            <section>
+                <h2 class="text-xl font-semibold text-blue-600 mb-4">Daily Sleep Duration</h2>
+                <canvas id="sleepChart" class="w-full h-64"></canvas>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Please log in to view insights.');
+                window.location.href = 'login.html';
+                return false;
+            }
+            return token;
+        }
+
+        // Get last 7 days' dates
+        function getLast7Days() {
+            const dates = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                dates.push(date.toLocaleDateString('en-GB').split('/').join('/'));
+            }
+            return dates;
+        }
+
+        // Map mood to score
+        function moodToScore(mood) {
+            const scores = {
+                'Awful': 1,
+                'Bad': 2,
+                'Normal': 3,
+                'Good': 4,
+                'Amazing': 5
+            };
+            return scores[mood] || 0;
+        }
+
+        // Fetch mood data
+        async function fetchMoodData(token) {
+            try {
+                const response = await fetch('http://localhost:3000/api/moods', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (response.status === 401 || response.status === 403) {
+                        alert('Session expired or invalid. Please log in again.');
+                        window.location.href = 'login.html';
+                    }
+                    throw new Error(errorData.error || 'Failed to fetch mood data');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching mood data:', error.message);
+                alert(`Failed to load mood data: ${error.message}`);
+                return [];
+            }
+        }
+
+        // Fetch sleep data
+        async function fetchSleepData(token) {
+            try {
+                const response = await fetch('http://localhost:3000/api/sleep-records', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (response.status === 401 || response.status === 403) {
+                        alert('Session expired or invalid. Please log in again.');
+                        window.location.href = 'login.html';
+                    }
+                    throw new Error(errorData.error || 'Failed to fetch sleep data');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching sleep data:', error.message);
+                alert(`Failed to load sleep data: ${error.message}`);
+                return [];
+            }
+        }
+
+        // Prepare mood data
+        function prepareMoodData(moodHistory) {
+            const last7Days = getLast7Days();
+            const moodScores = last7Days.map(date => {
+                const entry = moodHistory.find(item => {
+                    const itemDate = new Date(item.date).toLocaleDateString('en-GB').split('/').join('/');
+                    return itemDate === date;
+                });
+                return entry ? moodToScore(entry.mood) : 0;
+            });
+            return {
+                labels: last7Days,
+                data: moodScores
+            };
+        }
+
+        // Prepare sleep data
+        function prepareSleepData(sleepHistory) {
+            const last7Days = getLast7Days();
+            const sleepHours = last7Days.map(date => {
+                const entry = sleepHistory.find(item => {
+                    const itemDate = new Date(item.date).toLocaleDateString('en-GB').split('/').join('/');
+                    return itemDate === date;
+                });
+                return entry ? parseFloat(entry.duration) : 0;
+            });
+            return {
+                labels: last7Days,
+                data: sleepHours
+            };
+        }
+
+        // Create mood chart
+        function createMoodChart(moodData) {
+            const { labels, data } = moodData;
+            new Chart(document.getElementById('moodChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Mood Score',
+                        data: data,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 5,
+                            ticks: {
+                                stepSize: 1,
+                                callback: value => {
+                                    const moods = ['', 'Awful', 'Bad', 'Normal', 'Good', 'Amazing'];
+                                    return moods[value] || value;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create sleep chart
+        function createSleepChart(sleepData) {
+            const { labels, data } = sleepData;
+            new Chart(document.getElementById('sleepChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Sleep Hours',
+                        data: data,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 12,
+                            ticks: {
+                                stepSize: 2
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize charts
+        async function initializeCharts() {
+            const token = await checkAuth();
+            if (!token) return;
+
+            const moodHistory = await fetchMoodData(token);
+            const sleepHistory = await fetchSleepData(token);
+
+            if (moodHistory.length || sleepHistory.length) {
+                const moodData = prepareMoodData(moodHistory);
+                const sleepData = prepareSleepData(sleepHistory);
+                createMoodChart(moodData);
+                createSleepChart(sleepData);
+            } else {
+                console.warn('No mood or sleep data available for the last 7 days.');
+                alert('No mood or sleep data available. Please add entries via the quiz or sleep tracker.');
+            }
+        }
+
+        // Run initialization
+        initializeCharts();
+    </script>
+</body>
+</html>

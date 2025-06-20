@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindfulness & Podcast - Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <button id="back-button" class="text-2xl" onclick="window.location.href='dashboard.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-2xl font-bold">Mindfulness & Podcast</h1>
+        <div class="w-8"></div> <!-- Placeholder for alignment -->
+    </header>
+    <!-- Main Content -->
+    <main class="flex-grow p-4">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-auto">
+            <!-- Search Bar -->
+            <div class="flex mb-6">
+                <input id="searchInput" type="text" class="w-full p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search nature music or podcasts (e.g., sad, happy)..." aria-label="Search nature music or podcasts">
+                <button id="searchButton" class="bg-blue-500 text-white p-2 rounded-r hover:bg-blue-600 transition">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <!-- Genre Buttons -->
+            <div class="flex flex-wrap gap-2 mb-6 justify-center">
+                <button class="genre-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-genre="recommended">Recommended</button>
+                <button class="genre-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-genre="sad">Sad</button>
+                <button class="genre-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-genre="happy">Happy</button>
+                <button class="genre-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-genre="anxious">Anxious</button>
+                <button class="genre-btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition" data-genre="depressed">Depressed</button>
+            </div>
+            <!-- Results Carousel -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-semibold text-blue-600">Results</h2>
+                    <div class="hidden md:flex gap-2">
+                        <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="videoContainer" data-direction="left">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="videoContainer" data-direction="right">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="videoContainer" class="flex overflow-x-auto gap-4 pb-2"></div>
+            </div>
+            <!-- Default Videos by Mood -->
+            <div id="defaultVideos">
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold text-blue-600">Sad</h2>
+                        <div class="hidden md:flex gap-2">
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="sadVideos" data-direction="left">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="sadVideos" data-direction="right">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sadVideos" class="flex overflow-x-auto gap-4 pb-2"></div>
+                </div>
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold text-blue-600">Happy</h2>
+                        <div class="hidden md:flex gap-2">
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="happyVideos" data-direction="left">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="happyVideos" data-direction="right">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="happyVideos" class="flex overflow-x-auto gap-4 pb-2"></div>
+                </div>
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold text-blue-600">Anxious</h2>
+                        <div class="hidden md:flex gap-2">
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="anxiousVideos" data-direction="left">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="anxiousVideos" data-direction="right">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="anxiousVideos" class="flex overflow-x-auto gap-4 pb-2"></div>
+                </div>
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-semibold text-blue-600">Depressed</h2>
+                        <div class="hidden md:flex gap-2">
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="depressedVideos" data-direction="left">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="carousel-btn bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition" data-carousel="depressedVideos" data-direction="right">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="depressedVideos" class="flex overflow-x-auto gap-4 pb-2"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Please log in to access mindfulness content.');
+                window.location.href = 'login.html';
+                return false;
+            }
+            return token;
+        }
+
+        // Load YouTube API
+        function loadYouTubeAPI() {
+            return new Promise(resolve => {
+                gapi.load('client', () => {
+                    gapi.client.init({
+                        apiKey: 'AIzaSyA6NkeF4uJmEW4AuH0YNYVAy6ySBLcHiXA',
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+                    }).then(() => {
+                        resolve();
+                    }).catch(err => {
+                        console.error('YouTube API init error:', err);
+                        document.getElementById('videoContainer').innerHTML = '<p class="text-red-500 text-center">Failed to load YouTube API.</p>';
+                        resolve(); // Continue even if API fails
+                    });
+                });
+            });
+        }
+
+        // Fetch latest mood
+        async function fetchLatestMood(token) {
+            try {
+                const response = await fetch('http://localhost:3000/api/moods?latest=true', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (response.status === 401 || response.status === 403) {
+                        alert('Session expired or invalid. Please log in again.');
+                        window.location.href = 'login.html';
+                    }
+                    throw new Error(errorData.error || 'Failed to fetch mood');
+                }
+                const moods = await response.json();
+                return moods[0] ? moods[0].mood : null;
+            } catch (error) {
+                console.error('Error fetching latest mood:', error.message);
+                return null;
+            }
+        }
+
+        // Map mood to search term
+        function mapMoodToSearchTerm(mood) {
+            const moodMap = {
+                'Awful': 'sad',
+                'Bad': 'sad',
+                'Normal': 'mindfulness',
+                'Good': 'happy',
+                'Amazing': 'happy'
+            };
+            return moodMap[mood] || 'mindfulness';
+        }
+
+        // Load recommended videos based on latest mood
+        async function loadRecommendedVideos() {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            const mood = await fetchLatestMood(token);
+            const searchTerm = mapMoodToSearchTerm(mood);
+            searchVideos(`nature music ${searchTerm} podcast`, 'videoContainer');
+        }
+
+        // Load default videos for each mood
+        function loadDefaultVideos() {
+            const moods = ['sad', 'happy', 'anxious', 'depressed'];
+            moods.forEach(mood => {
+                searchVideos(`nature music ${mood} podcast`, `${mood}Videos`, 3);
+            });
+        }
+
+        // Search YouTube videos
+        function searchVideos(query, containerId, maxResults = 8) {
+            gapi.client.youtube.search.list({
+                part: 'snippet',
+                q: query,
+                maxResults: maxResults,
+                type: 'video',
+                videoEmbeddable: 'true'
+            }).then(response => {
+                const videos = response.result.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    thumbnail: item.snippet.thumbnails.medium.url
+                }));
+                displayVideos(videos, containerId);
+            }).catch(err => {
+                console.error('YouTube API error:', err);
+                document.getElementById(containerId).innerHTML = '<p class="text-red-500 text-center">Error loading videos. Please try again.</p>';
+            });
+        }
+
+        // Display videos in the specified carousel
+        function displayVideos(videos, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            videos.forEach(video => {
+                const videoElement = document.createElement('div');
+                videoElement.className = 'bg-gray-50 p-4 w-64 rounded-lg shadow flex-shrink';
+                videoElement.innerHTML = `
+                    <h3 class="text-blue-600 font-semibold mb-2 truncate">${video.title}</h3>
+                    <img src="${video.thumbnail}" alt="${video.title}" class="w-full h-40 object-cover rounded mb-2">
+                    <iframe width="100%" height="auto" src="https://www.youtube.com/embed/${video.id}" frameborder="0" allowfullscreen="true" class="rounded">
+                    </iframe>
+                `;
+                container.appendChild(videoElement);
+            });
+        }
+
+        // Handle carousel navigation
+        function scrollCarousel(containerId, direction) {
+            const container = document.getElementById(containerId);
+            const scrollAmount = 300;
+            if (direction === 'left') {
+                container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            } else {
+                container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            }
+        }
+
+        // Handle search button click
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                searchVideos(`nature music ${query} podcast`, 'videoContainer');
+            } else {
+                alert('Please enter a search term.');
+            }
+        });
+
+        // Handle search on Enter key
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('searchButton').click();
+            }
+        });
+
+        // Handle genre button clicks
+        document.querySelectorAll('.genre-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const genre = button.dataset.genre;
+                if (genre === 'recommended') {
+                    loadRecommendedVideos();
+                } else {
+                    searchVideos(`nature music ${genre}`, 'videoContainer');
+                }
+                // Highlight active button
+                document.querySelectorAll('.genre-btn').forEach(btn => btn.classList.remove('bg-blue-700'));
+                button.classList.add('bg-blue-700');
+            });
+        });
+
+        // Handle carousel button clicks
+        document.querySelectorAll('.carousel-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const containerId = button.dataset.carousel;
+                const direction = button.dataset.direction;
+                scrollCarousel(containerId, direction);
+            });
+        });
+
+        // Initialize page
+        async function initialize() {
+            const token = await checkAuth();
+            if (!token) return;
+
+            await loadYouTubeAPI();
+            await loadRecommendedVideos();
+            loadDefaultVideos();
+        }
+
+        // Run initialization
+        initialize();
+    </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take a Quiz - Companion App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 flex justify-between items-center">
+        <button id="back-button" class="text-2xl" onclick="window.location.href='dashboard.html'">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h1 class="text-2xl font-bold">Take a Quiz</h1>
+        <div class="w-8"></div> <!-- Placeholder for alignment -->
+    </header>
+    <!-- Main Content -->
+    <div class="flex-grow flex items-center justify-center">
+        <article class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <!-- Quiz Form -->
+            <section class="space-y-4">
+                <form id="quizForm" class="space-y-4">
+                    <div>
+                        <p class="text-gray-700">How would you describe your energy level today?</p>
+                        <select class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" name="q1">
+                            <option value="1">Very Low</option>
+                            <option value="2">Low</option>
+                            <option value="3">Moderate</option>
+                            <option value="4">High</option>
+                            <option value="5">Very High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How positive do you feel today?</p>
+                        <select class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" name="q2">
+                            <option value="1">Very Negative</option>
+                            <option value="2">Somewhat Negative</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Positive</option>
+                            <option value="5">Very Positive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How stressed are you feeling right now?</p>
+                        <select class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" name="q3">
+                            <option value="1">Very Stressed</option>
+                            <option value="2">Somewhat Stressed</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Relaxed</option>
+                            <option value="5">Very Relaxed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How motivated are you today?</p>
+                        <select class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" name="q4">
+                            <option value="1">Not Motivated</option>
+                            <option value="2">Slightly Motivated</option>
+                            <option value="3">Moderately Motivated</option>
+                            <option value="4">Motivated</option>
+                            <option value="5">Highly Motivated</option>
+                        </select>
+                    </div>
+                    <div>
+                        <p class="text-gray-700">How connected do you feel to others?</p>
+                        <select class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" name="q5">
+                            <option value="1">Very Disconnected</option>
+                            <option value="2">Somewhat Disconnected</option>
+                            <option value="3">Neutral</option>
+                            <option value="4">Somewhat Connected</option>
+                            <option value="5">Very Connected</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition">Submit Quiz</button>
+                </form>
+                <!-- Result Display -->
+                <div id="result" class="mt-4 hidden text-center">
+                    <p id="moodResult" class="text-lg font-semibold text-blue-600"></p>
+                    <p id="subMoodResult" class="text-gray-700"></p>
+                    <p class="text-gray-700 mt-2">Based on your mood, we recommend checking out some videos in the Mindfulness & Podcast section.</p>
+                    <button onclick="window.location.href='mindfulness.html'" class="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition">Go to Mindfulness & Podcast</button>
+                </div>
+            </section>
+        </article>
+    </div>
+
+    <script>
+        // Loading YouTube API
+        function loadYouTubeAPI() {
+            gapi.load('client', () => {
+                gapi.client.init({
+                    apiKey: 'AIzaSyA6NkeF4uJmEW4AuH0YNYVAy6ySBLcHiXA',
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+                });
+            });
+        }
+
+        // Calculating mood based on quiz answers
+        function calculateMood(answers) {
+            const score = answers.reduce((sum, val) => sum + parseInt(val), 0) / answers.length;
+            let mood, subMood;
+            if (score <= 1.5) {
+                mood = 'Awful';
+                subMood = 'sad af';
+            } else if (score <= 2.5) {
+                mood = 'Bad';
+                subMood = 'worried';
+            } else if (score <= 3.5) {
+                mood = 'Normal';
+                subMood = 'wondering';
+            } else if (score <= 4.5) {
+                mood = 'Good';
+                subMood = 'yolo';
+            } else {
+                mood = 'Amazing';
+                subMood = 'over the moon';
+            }
+            return { mood, subMood };
+        }
+
+        // Recommending YouTube videos based on mood
+        function recommendVideos(mood) {
+            const queries = {
+                Awful: 'calming meditation',
+                Bad: 'stress relief meditation',
+                Normal: 'daily mindfulness',
+                Good: 'motivational podcast',
+                Amazing: 'inspirational talk'
+            };
+            const searchQuery = queries[mood] || 'mindfulness';
+            gapi.client.youtube.search.list({
+                part: 'snippet',
+                q: searchQuery,
+                maxResults: 5,
+                type: 'video'
+            }).then(response => {
+                const videos = response.result.items.map(item => ({
+                    id: item.id.videoId,
+                    title: item.snippet.title
+                }));
+                localStorage.setItem('recommendedVideos', JSON.stringify(videos));
+            }).catch(err => console.error('YouTube API error:', err));
+        }
+
+        // Saving mood to backend
+        async function saveMood(mood, subMood) {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.log('No token found, redirecting to login');
+                alert('Please log in to save your mood.');
+                window.location.href = 'login.html';
+                return false;
+            }
+            try {
+                const response = await fetch('http://localhost:3000/api/moods', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ mood, subMood })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Failed to save mood:', response.status, errorData);
+                    if (response.status === 401 || response.status === 403) {
+                        alert('Session expired or invalid. Please log in again.');
+                        window.location.href = 'login.html';
+                        return false;
+                    }
+                    throw new Error(errorData.error || 'Failed to save mood');
+                }
+                console.log('Mood saved successfully:', mood, subMood);
+                return true;
+            } catch (error) {
+                console.error('Error saving mood:', error.message);
+                alert(`Failed to save mood: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('quizForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const answers = [
+                form.q1.value,
+                form.q2.value,
+                form.q3.value,
+                form.q4.value,
+                form.q5.value
+            ].filter(val => val !== '');
+            if (answers.length !== 5) {
+                alert('Please answer all questions.');
+                return;
+            }
+            const { mood, subMood } = calculateMood(answers);
+            const saved = await saveMood(mood, subMood);
+            if (saved) {
+                recommendVideos(mood);
+                document.getElementById('moodResult').textContent = `Your Mood: ${mood}`;
+                document.getElementById('subMoodResult').textContent = `Feeling: ${subMood}`;
+                document.getElementById('result').classList.remove('hidden');
+                form.classList.add('hidden');
+            }
+        });
+
+        // Initialize YouTube API
+        loadYouTubeAPI();
+    </script>
+</body>
+</html>
