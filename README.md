@@ -251,9 +251,13 @@ CREATE TABLE moods (
 7. **Mindfulness**: Explore mood-based content (videos, podcasts).
 
 ## Screenshots
-*(Add screenshots here, e.g., dashboard, goals page, mood chart. Use a tool like Lightshot to capture and host images.)*
-- Dashboard: [Insert link]
-- Mood Chart: [Insert link]
+- Welcome: ![Welcome Screenshot](frontend/assets/screens/welcomepage.PNG)
+- Login/Signup: ![Login/Signup Screenshot](frontend/assets/screens/login_signup.PNG)
+- Dashboard: ![Dashboard Screenshot](frontend/assets/screens/dashboard.PNG)
+- Quiz: ![Quiz Screenshot](frontend/assets/screens/quiz.PNG)
+- Goals: ![Goals Screenshot](frontend/assets/screens/goals.PNG)
+- Insights: ![Insights Screenshot](frontend/assets/screens/insights.PNG)
+- mindfullness: ![Mindfullness Screenshot](frontend/assets/screens/mindfullness.PNG)
 
 ## Future Improvements
 - Implement quiz submission logic in `quiz.js` to store responses in `quiz_responses` table.
