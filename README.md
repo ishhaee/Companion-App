@@ -103,7 +103,7 @@ companion-app/
    Replace `your_mysql_username` and `your_mysql_password` with your MySQL credentials.
 4. Start the backend server:
    ```bash
-   node index.js
+   node server.js
    ```
    The server runs on `http://localhost:3000`.
 
