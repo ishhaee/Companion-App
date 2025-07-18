@@ -129,7 +129,7 @@
             return new Promise(resolve => {
                 gapi.load('client', () => {
                     gapi.client.init({
-                        apiKey: 'AIzaSyA6NkeF4uJmEW4AuH0YNYVAy6ySBLcHiXA',
+                        apiKey: 'yourGoogleAPI',
                         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
                     }).then(() => {
                         resolve();
